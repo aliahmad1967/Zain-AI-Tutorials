@@ -1,10 +1,13 @@
 import json
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen
 from zoneinfo import ZoneInfo
+
+_DOCUMENTS_DIRECTORY = Path(__file__).resolve().parent / "documents"
 
 _WEATHER_DESCRIPTIONS = {
     0: "Clear sky",
@@ -60,6 +63,36 @@ def get_current_time() -> str:
     baghdad_tz = ZoneInfo("Asia/Baghdad")
     current_time = datetime.now(baghdad_tz)
     return current_time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def read_document(filename: str) -> str:
+    """Read a UTF-8 text file located inside the documents directory."""
+    filename = filename.strip()
+    if not filename:
+        raise ValueError("A document filename is required.")
+
+    relative_path = Path(filename)
+    if relative_path.is_absolute():
+        raise ValueError("The document path must be relative to documents/.")
+
+    documents_directory = _DOCUMENTS_DIRECTORY.resolve()
+    try:
+        document_path = (documents_directory / relative_path).resolve(strict=True)
+    except (OSError, RuntimeError) as error:
+        raise RuntimeError(f"Could not find document {filename!r}: {error}") from error
+
+    try:
+        document_path.relative_to(documents_directory)
+    except ValueError as error:
+        raise ValueError("The document path must stay inside documents/.") from error
+
+    if not document_path.is_file():
+        raise ValueError(f"{filename!r} is not a file.")
+
+    try:
+        return document_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise RuntimeError(f"Could not read document {filename!r}: {error}") from error
 
 
 def get_weather(location: str) -> str:
